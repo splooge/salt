@@ -1,0 +1,3 @@
+include:
+  - netbox-git
+  - packages

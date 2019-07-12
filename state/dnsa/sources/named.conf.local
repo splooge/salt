@@ -1,0 +1,4 @@
+zone "lab.pwned.com" {
+    type master;
+    file "/etc/bind/db.lab.pwned.com";
+};

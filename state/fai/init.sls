@@ -1,0 +1,4 @@
+include:
+  - .mount
+  - .packages
+  - .files
