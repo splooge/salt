@@ -33,10 +33,30 @@ kubernetes-delete-swapfile:
   file.absent:
     - name: /swap.img
 
+etc-docker-daemon.json:
+  file.managed:
+    - name: /etc/docker/daemon.json
+    - source: salt://k8s/sources/daemon.json
+    - user: root
+    - group: root
+    - mode: 644
+
+etc-systemd-system-docker.service.d:
+  file.directory:
+    - name: /etc/systemd/system/docker.service.d
+    - user: root
+    - group: root
+    - dir_mode: 755
+    - makedirs: True
+    - recurse:
+      - user
+      - group
+      - mode
+
 docker-install:
   pkg.installed:
     - pkgs:
-      - docker-ce
+      - docker-ce: 18.06.2~ce~3-0~ubuntu
       - docker-ce-cli
       - containerd.io
 
