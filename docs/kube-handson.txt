@@ -5,7 +5,7 @@ In the atlanta.xla.edgecastdn.net openstack environment spin up 3 VM's.  This wi
 echo "server.xla > /etc/hostname"; hostname -F /etc/hostname
 
 # Add server hostname to /etc/hosts: 
-echo "ipaddr hostname.xla hostname" >> /etc/hosts
+echo "hostname.xla hostname" >> /etc/hosts
 
 # Adjust DNS servers to working ones:
 echo -e "search edgecastcdn.net\nnameserver 192.229.150.190\nnameserver 192.229.150.191" > /etc/resolv.conf
