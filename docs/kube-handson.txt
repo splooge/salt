@@ -1,0 +1,237 @@
+
+Save  New  Duplicate & Edit  Just Text  Twitter
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55
+56
+57
+58
+59
+60
+61
+62
+63
+64
+65
+66
+67
+68
+69
+70
+71
+72
+73
+74
+75
+76
+77
+78
+79
+80
+81
+82
+83
+84
+85
+86
+87
+88
+89
+90
+91
+92
+93
+94
+95
+96
+97
+98
+99
+100
+101
+102
+103
+104
+105
+106
+107
+108
+109
+110
+111
+112
+113
+114
+115
+116
+117
+118
+In the atlanta.xla.edgecastdn.net openstack environment spin up 3 VM's.  This will be for 1 master and 2 nodes.  I chose the Ubuntu-1604-Latest image in the m1.medium capacity.  Name them anything you want so long as you can distinguist between them.  You can login to openstack XLA using your ECDC account.  When creating the VM's, place them in the XLA-New network.  Use the k8s-control-plane security group for the masters and k8s-worker-nodes security group for the workers.  Setup your ssh keys and do a dist-upgrade to bring them up to date.  The default user name is `ubuntu`.
+
+# Adjust /etc/hostname 
+echo "server.xla > /etc/hostname"; hostname -F /etc/hostname
+
+# Add server hostname to /etc/hosts: 
+echo "ipaddr hostname.xla hostname" >> /etc/hosts
+
+# Adjust DNS servers to working ones:
+echo -e "search edgecastcdn.net\nnameserver 192.229.150.190\nnameserver 192.229.150.191" > /etc/resolv.conf
+
+Add the docker and kubernetes repos:
+curl -s https://download.docker.com/linux/ubuntu/gpg | apt-key add -
+curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
+echo "deb [ arch=amd64 ] https://download.docker.com/linux/ubuntu xenial stable" > /etc/apt/sources.list.d/docker-repo.list
+echo "deb [ arch=amd64 ] https://apt.kubernetes.io/ kubernetes-xenial main" > /etc/apt/sources.list.d/kubernetes-repo.list
+apt-get update
+
+# Install docker packages:
+apt-get install -y docker-ce=18.06.2~ce~3-0~ubuntu; apt-get install -y install docker-ce-cli containerd.io
+
+# Install (and hold) kubernetes packages:  https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/
+apt-get install -y kubelet kubeadm kubectl && apt-mark hold kubelet kubeadm kubectl
+
+# docker wants some systemd stuff - this will get rid of warnings during kubeadm init
+# Setup daemon.
+cat > /etc/docker/daemon.json <<EOF
+{
+  "exec-opts": ["native.cgroupdriver=systemd"],
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "100m"
+  },
+  "storage-driver": "overlay2"
+}
+EOF
+
+mkdir -p /etc/systemd/system/docker.service.d
+
+# Restart docker.
+systemctl daemon-reload
+systemctl restart docker
+
+# Initialize/bootstrap the master with kubeadm
+
+sudo kubeadm config images pull # optional, just for transparency
+
+sudo kubeadm init  # Take note of the output, mainly the `kubeadm join` output, and keep it some place for later.
+
+# To tear down the master, in case you want to restart k8s install without rebuilding the VM from scratch:
+# kubectl drain <node name> --delete-local-data --force --ignore-daemonsets
+# kubectl delete node <node name>
+# kubeadm reset
+
+# kubectl is the program you will user to interact with kubernetes
+# Setup config for kubectl:
+
+  mkdir -p $HOME/.kube
+  sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+  sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+# Install networking in kubernetes:
+# Optional: You can do this step after joining the nodes, then you can watch the nodes all join the cluster
+# at once, once networking is installed.
+
+kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')"
+
+# Check out your new networking pod:
+
+kubectl get pods --all-namespaces
+
+# Join your nodes to the cluster using the output of the `kubeadm init` command:
+# Optional, you can pull images before running kubeadm init/join:
+
+
+sudo kubeadm join --token <token> <master-ip>:<master-port> --discovery-token-ca-cert-hash sha256:<hash>
+
+# On the master, show/watch your nodes:
+
+kubectl get nodes
+kubectl get nodes -w # the `-w` flag is for `watch` and will show changes as they happen
+
+# If we have enough time let's install kubectl locally and install kubernetes-dashboard
+
+# cli
+brew install kubernetes-cli
+mkdir -p $HOME/.kube && cd .kube
+scp ubuntu@cs-k8s-master001.xla:/home/ubuntu/.kube/config .
+
+# kubernetes-dashboard
+# https://github.com/kubernetes/dashboard
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v1.10.1/src/deploy/recommended/kubernetes-dashboard.yaml
+
+# create dashboard-admin user yaml
+dashboard-adminuser.yaml:
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: admin-user
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+- kind: ServiceAccount
+  name: admin-user
+  namespace: kube-system
+
+  kubectl apply -f dashboard-adminuser.yaml
+
+# get token for newly created user:
+
+kubectl -n kube-system describe secret $(kubectl -n kube-system get secret | grep admin-user | awk '{print $1}')
+
+kubectl proxy
+
+http://localhost:8001/api/v1/namespaces/kube-system/services/https:kubernetes-dashboard:/proxy/
