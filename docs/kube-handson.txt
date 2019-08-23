@@ -53,7 +53,7 @@ sudo kubeadm init  # Take note of the output, mainly the `kubeadm join` output, 
 # kubectl delete node <node name>
 # kubeadm reset
 
-# kubectl is the program you will user to interact with kubernetes
+# kubectl is the program you will use to interact with kubernetes
 # Setup config for kubectl:
 
   mkdir -p $HOME/.kube
@@ -73,7 +73,6 @@ kubectl get pods --all-namespaces
 # Join your nodes to the cluster using the output of the `kubeadm init` command:
 # Optional, you can pull images before running kubeadm init/join:
 
-
 sudo kubeadm join --token <token> <master-ip>:<master-port> --discovery-token-ca-cert-hash sha256:<hash>
 
 # On the master, show/watch your nodes:
@@ -83,7 +82,7 @@ kubectl get nodes -w # the `-w` flag is for `watch` and will show changes as the
 
 # If we have enough time let's install kubectl locally and install kubernetes-dashboard
 
-# cli
+# cli/macos
 brew install kubernetes-cli
 mkdir -p $HOME/.kube && cd .kube
 scp ubuntu@cs-k8s-master001.xla:/home/ubuntu/.kube/config .
